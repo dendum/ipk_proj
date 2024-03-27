@@ -1,0 +1,4 @@
+C:\Windows\system32\wsl.exe --distribution Debian --exec /bin/bash -c "export PATH=\":$PATH\" && export CMAKE_COLOR_DIAGNOSTICS=ON && export CLION_IDE=TRUE && export JETBRAINS_IDE=TRUE && cd /mnt/d/Other/4_semestr/IPK/proj_1/ipk_proj/cmake-build-debug && /usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=make -G 'CodeBlocks - Unix Makefiles' -S /mnt/d/Other/4_semestr/IPK/proj_1/ipk_proj -B /mnt/d/Other/4_semestr/IPK/proj_1/ipk_proj/cmake-build-debug"
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /mnt/d/Other/4_semestr/IPK/proj_1/ipk_proj/cmake-build-debug

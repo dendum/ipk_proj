@@ -1,0 +1,3 @@
+/mnt/d/Other/4_semestr/IPK/proj_1/ipk_proj/cmake-build-debug/CMakeFiles/ipk_proj.dir
+/mnt/d/Other/4_semestr/IPK/proj_1/ipk_proj/cmake-build-debug/CMakeFiles/edit_cache.dir
+/mnt/d/Other/4_semestr/IPK/proj_1/ipk_proj/cmake-build-debug/CMakeFiles/rebuild_cache.dir
