@@ -1,5 +1,4 @@
 #define MAX_EVENTS 10
-#define BUFFER_SIZE 1024
 
 #include "IPKClient.h"
 
@@ -7,6 +6,7 @@ const int DEFAULT_PORT = 4567;
 const int DEFAULT_TIMEOUT = 250;
 const int DEFAULT_RETRANSMITS = 3;
 const std::string USAGE_STRING = "Usage: ./ipk24 -s <host> -p <port> -t <mode> -d <timeout> -r <udpRet> -h <help>\n";
+const std::string HELP_STRING = "help info:\n/auth\t{Username} {Secret} {DisplayName}\n/join\t{ChannelID}\n/rename\t{DisplayName}\n/help\n";
 enum class Protocol {
     TCP,
     UDP,
@@ -56,6 +56,15 @@ void parse_arguments(int argc, char *argv[], std::string &hostname, Protocol &pr
                 break;
         }
     }
+}
+
+vector<string> getInputData(const string &str) {
+    std::vector<std::string> words;
+    std::stringstream ss(str);
+    std::string word;
+    while (ss >> word)
+        words.push_back(word);
+    return words;
 }
 
 int main(int argc, char *argv[]) {
@@ -111,6 +120,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         int num_events = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+        cout << "CUR STATE: " << client.getState() << endl;
         for (int i = 0; i < num_events; ++i) {
             if (events[i].data.fd == stdin_fd) {
                 std::cin.getline(buffer, BUFFER_SIZE);
@@ -118,16 +128,55 @@ int main(int argc, char *argv[]) {
                     close(epoll_fd);
                     return 0;
                 }
-                send(client.fd, buffer, strlen(buffer), 0);
-            } else if (events[i].data.fd == client.fd) {  // Input from server
+                vector<string> words = getInputData(std::string(buffer));
+                if (client.state == IPKState::AUTH) {
+                    if (words[0] == "/auth") {
+                        if (!client.send_auth_info(words)) {
+                            client.printError();
+                        } else if (client.state == IPKState::ERROR) {
+                            client.printError();
+                            return EXIT_FAILURE;
+                        } else
+                            cout << "PS: send data for auth" << endl;
+                    } else if (words[0] == "/help") {
+                        cout << HELP_STRING;
+                    } else {
+                        // TODO rest
+                        client.err_msg = "You are not authed! PS: TODO rest";
+                        client.printError();
+                    }
+                } else if (client.state == IPKState::OPEN) {
+
+                } else if (client.state == IPKState::ERROR) {
+
+                } else {
+
+                }
+
+                memset(buffer, 0, BUFFER_SIZE);
+            } else if (events[i].data.fd == client.fd) {
                 int bytes_received = recv(client.fd, buffer, BUFFER_SIZE, 0);
                 if (bytes_received <= 0) {
-                    std::cerr << "Server closed the connection." << std::endl;
+                    cerr << "Server closed the connection." << std::endl;
                     close(epoll_fd);
-                    return 1;
+                    return EXIT_FAILURE;
                 }
                 buffer[bytes_received] = '\0';
-                std::cout << "Received: " << buffer;
+                vector<string> words = getInputData(std::string(buffer));
+                if (client.state == IPKState::AUTH) {
+                    if (words[0] == "REPLY") {
+                        client.receive(MESSAGEType::REPLY, words);
+                    }
+                } else if (client.state == IPKState::OPEN) {
+
+                } else if (client.state == IPKState::ERROR) {
+
+                } else {
+
+                }
+
+//                cout << "Received: " << buffer;
+                memset(buffer, 0, BUFFER_SIZE);
             }
         }
     }

@@ -1,5 +1,20 @@
 #include "IPKClient.h"
 
+string IPKClient::getState() {
+    switch (state) {
+        case IPKState::START:
+            return "START";
+        case IPKState::AUTH:
+            return "AUTH";
+        case IPKState::OPEN:
+            return "OPEN";
+        case IPKState::ERROR:
+            return "ERROR";
+    }
+    return "NONE";
+}
+
+
 IPKClient::IPKClient(int port, string hostname, int mode) {
     state = IPKState::START;
 
@@ -61,3 +76,87 @@ IPKClient::~IPKClient() {
     shutdown(fd, SHUT_RDWR);
     close(fd);
 }
+
+bool IPKClient::send_auth_info(const vector<string>& words) {
+    if (words.size() != 4) { // TODO Add checkers
+        err_msg = "Invalid /auth data! Try again!";
+        return false;
+    }
+
+    username = words[1];
+    secret = words[2];
+    displayName = words[3];
+
+    int sent_bytes = send("AUTH " + username + " AS " + displayName + " USING " + secret + "\r\n");
+    if (sent_bytes < 0) {
+        err_msg = "Failed to send all data to server!";
+        this->state = IPKState::ERROR;
+    }
+    return true;
+}
+
+ssize_t IPKClient::send(const string &str) {
+    array<char, BUFFER_SIZE> buffer{0};
+    memcpy(buffer.data(), str.data(), str.size() + 1);
+
+    ssize_t sent_bytes = ::send(fd, buffer.data(), str.size(), 0);
+    if (sent_bytes < 0) {
+        err_msg = "Failed to send data to server!";
+        this->state = IPKState::ERROR;
+    }
+
+    return sent_bytes;
+}
+
+void IPKClient::receive(MESSAGEType messageType, const vector<string>& words) {
+    if (messageType == MESSAGEType::REPLY) {
+        if(words.size() > 2) {
+            std::string replyStatus = words[1];
+            std::vector<std::string> messageContent(words.begin()+3, words.end());
+            if(replyStatus == "OK") {
+                state = IPKState::OPEN;
+            }
+            clientPrint(MESSAGEType::REPLY, messageContent);
+        } else {
+            err_msg = "Invalid message format!";
+            this->state = IPKState::ERROR;
+            // TODO SEND ERR AND EXIT
+        }
+    } else {
+
+    }
+}
+
+void IPKClient::clientPrint(MESSAGEType type, const vector<string>& messageContent) {
+    switch (type) {
+        case MESSAGEType::REPLY:{
+            if (state == IPKState::OPEN) {
+                cout << "Success: ";
+            } else {
+                cout << "Failure: ";
+            }
+            for (const auto &message: messageContent) {
+                cout << message << " ";
+            }
+            cout << "\n";
+            break;
+        }
+        case MESSAGEType::ERR:
+            break;
+        case MESSAGEType::AUTH:
+            break;
+        case MESSAGEType::JOIN:
+            break;
+        case MESSAGEType::MSG:
+            break;
+        case MESSAGEType::BYE:
+            break;
+        case MESSAGEType::CONFIRM:
+            break;
+    }
+}
+
+void IPKClient::printError() {
+    cerr << "ERR: " << err_msg << endl;
+}
+

@@ -18,17 +18,30 @@
 #include <cstdlib>
 #include <utility>
 #include <sys/epoll.h>
+#include <vector>
+#include <sstream>
 
 
 using namespace std;
 
 #define TIMEOUT 4
+#define BUFFER_SIZE 1024
 
 enum class IPKState {
     START,
     AUTH,
     OPEN,
     ERROR,
+};
+
+enum class MESSAGEType {
+    REPLY,
+    ERR,
+    AUTH,
+    JOIN,
+    MSG,
+    BYE,
+    CONFIRM
 };
 
 class IPKClient {
@@ -38,6 +51,9 @@ class IPKClient {
     struct hostent* host;
     struct sockaddr_in server_address {};
     socklen_t addr_len = sizeof(server_address);
+    string username;
+    string displayName;
+    string secret;
 
 
 
@@ -50,12 +66,14 @@ public:
     ~IPKClient();
 
     void connect();
+    bool send_auth_info(const vector<string>& words);
+    void receive(MESSAGEType messageType,const vector<string>& words);
+    ssize_t send(const string& str);
+    void printError();
+    void clientPrint(MESSAGEType type, const vector<string>& messageContent);
 
-//    void sendRequest();
-//
-//    void receiveResponse();
-//
 //    void disconnect();
+    string getState();
 };
 
 
