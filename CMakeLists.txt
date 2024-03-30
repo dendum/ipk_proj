@@ -3,4 +3,6 @@ project(ipk_proj)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(ipk_proj main.cpp)
+add_executable(ipk_proj main.cpp
+        IPKClient.cpp
+)
