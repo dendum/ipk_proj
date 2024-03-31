@@ -68,7 +68,6 @@ vector<string> getInputData(const string &str) {
 }
 
 int main(int argc, char *argv[]) {
-    std::cout << "Hello, World!" << std::endl;
 
     std::string hostname;
     Protocol protocol = Protocol::None;
@@ -117,8 +116,8 @@ int main(int argc, char *argv[]) {
     epoll_ctl_add(epoll_fd, event, stdin_fd);
 
     char buffer[BUFFER_SIZE];
-
-    while (true) {
+    bool going = true;
+    while (going) {
         int num_events = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
         cout << "CUR STATE: " << client.getState() << endl;
         for (int i = 0; i < num_events; ++i) {
@@ -133,33 +132,50 @@ int main(int argc, char *argv[]) {
                     continue;
                 if (client.state == IPKState::AUTH) {
                     if (words[0] == "/auth") {
-                        if (!client.send_auth_info(words)) {
-                            client.printError();
-                        } else if (client.state == IPKState::ERROR) {
-                            client.printError();
-                            return EXIT_FAILURE;
+                        client.send_info(MESSAGEType::AUTH, words);
+                        if (client.state == IPKState::ERROR) {
+                            going = false;
+                            break;
                         }
                     } else if (words[0] == "/help") {
                         cout << HELP_STRING;
                     } else {
-                        // TODO rest
-                        client.err_msg = "You are not authed! PS: TODO rest";
-                        client.printError();
+                        client.clientPrint(MESSAGEType::ERR,
+                                           {"You are not authed! Try: /auth {Username} {Secret} {DisplayName}"}, "");
                     }
                 } else if (client.state == IPKState::OPEN) {
                     if (words[0] == "/join") {
+                        client.send_info(MESSAGEType::JOIN, words);
+                        if (client.state == IPKState::ERROR) {
+                            going = false;
+                            break;
+                        }
                     } else if (words[0] == "/rename") {
+                        client.rename(words);
                     } else if (words[0] == "/help") {
                         cout << HELP_STRING;
+                    } else if (words[0] == "BYE") {
+                        client.send_info(MESSAGEType::BYE, words);
+                        if (client.state == IPKState::ERROR) {
+                            going = false;
+                            break;
+                        }
+                        // TODO??? Break while anyway, we sent BYE!
+                        going = false;
+                        break;
                     } else {
-                        if (client.send_info(MESSAGEType::MSG, words)) {
-                            // TODO ERROR
+                        client.send_info(MESSAGEType::MSG, words);
+                        if (client.state == IPKState::ERROR) {
+                            going = false;
+                            break;
                         }
                     }
                 } else if (client.state == IPKState::ERROR) {
-
+                    cout << "HERE_1" << endl;
+                    going = false;
+                    break;
                 } else {
-
+                    cout << "HERE_2" << endl;
                 }
 
                 memset(buffer, 0, BUFFER_SIZE);
@@ -175,30 +191,41 @@ int main(int argc, char *argv[]) {
                 if (client.state == IPKState::AUTH) {
                     if (words[0] == "REPLY") {
                         client.receive(MESSAGEType::REPLY, words);
-                    } else {
-                        // something else maybe/ 99.9%
-                    }
-                } else if (client.state == IPKState::OPEN) {
-                    if (words[0] == "REPLY") {
-                        client.receive(MESSAGEType::REPLY, words);
-                    } else {
-
-                    }
-                    if (words[0] == "MSG") {
+                    } else if (words[0] == "MSG") {
                         client.receive(MESSAGEType::MSG, words);
                     } else {
 
                     }
+                } else if (client.state == IPKState::OPEN) {
+                    if (words[0] == "REPLY") {
+                        client.receive(MESSAGEType::REPLY, words);
+                    } else if (words[0] == "MSG") {
+                        client.receive(MESSAGEType::MSG, words);
+                    } else if (words[0] == "ERR") {
+                        client.receive(MESSAGEType::ERR_MSG, words);
+                    } else {
+                        client.receive(MESSAGEType::UNKNOWN, words);
+                    }
+
+                    if (client.state == IPKState::BYE || client.state == IPKState::ERROR) {
+                        going = false;
+                        break;
+                    }
                 } else if (client.state == IPKState::ERROR) {
-
+                    cout << "HERE_3" << endl;
+                    going = false;
+                    break;
                 } else {
-
+                    cout << "HERE_4" << endl;
                 }
 
-//                cout << "Received: " << buffer;
                 memset(buffer, 0, BUFFER_SIZE);
             }
         }
+    }
+    if (client.state == IPKState::ERROR) {
+        client.printError();
+        return EXIT_FAILURE;
     }
 
     // Cleanup

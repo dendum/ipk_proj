@@ -10,6 +10,8 @@ string IPKClient::getState() {
             return "OPEN";
         case IPKState::ERROR:
             return "ERROR";
+        case IPKState::BYE:
+            return "BYE";
     }
     return "NONE";
 }
@@ -32,7 +34,7 @@ IPKClient::IPKClient(int port, string hostname, int mode) {
 
     /* Resolve hostname */
     host = gethostbyname(this->hostname.c_str());
-    if (host == nullptr) {
+    if (host == NULL) {
         err_msg = "Failed to resolve hostname!";
         state = IPKState::ERROR;
         return;
@@ -71,33 +73,41 @@ void IPKClient::connect() {
     this->state = IPKState::AUTH;
 }
 
+void IPKClient::disconnect() {
+    // TCP
+    if (mode == SOCK_STREAM) {
+        /* Client is up - graceful exit */
+        if (state != IPKState::BYE) {
+
+        }
+
+    }
+}
+
 IPKClient::~IPKClient() {
     // TODO if (need) {disconnect()}
     shutdown(fd, SHUT_RDWR);
     close(fd);
 }
 
-bool IPKClient::send_auth_info(const vector<string> &words) {
-    if (words.size() != 4) { // TODO Add checkers
-        err_msg = "Invalid /auth data! Try again!";
-        return false;
-    }
+void IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) {
+    if (messageType == MESSAGEType::AUTH) {
+        if (words.size() != 4) { // TODO Add checkers
+            clientPrint(MESSAGEType::ERR, {"Invalid /auth data! Try again!"}, "");
+            return;
+        }
 
-    username = words[1];
-    secret = words[2];
-    displayName = words[3];
+        username = words[1];
+        secret = words[2];
+        displayName = words[3];
 
-    int sent_bytes = send("AUTH " + username + " AS " + displayName + " USING " + secret + "\r\n");
-    if (sent_bytes < 0) {
-        err_msg = "Failed to send all data to server!";
-        this->state = IPKState::ERROR;
-    }
-    return true;
-}
-
-bool IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) {
-    if (messageType == MESSAGEType::MSG) {
-        string str = "MSG FROM" + displayName + " IS ";
+        int sent_bytes = send("AUTH " + username + " AS " + displayName + " USING " + secret + "\r\n");
+        if (sent_bytes < 0) {
+            err_msg = "Failed to send all data to server!";
+            this->state = IPKState::ERROR;
+        }
+    } else if (messageType == MESSAGEType::MSG) {
+        string str = "MSG FROM " + displayName + " IS ";
         for (const auto &word: words) {
             str += word + " ";
         }
@@ -108,12 +118,46 @@ bool IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) 
         if (sent_bytes < 0) {
             err_msg = "Failed to send all data to server!";
             this->state = IPKState::ERROR;
-            return false;
         }
-    } else {
+    } else if (messageType == MESSAGEType::ERR_MSG) {
+        string str = "ERR FROM " + displayName + " IS ";
+        for (const auto &word: words) {
+            str += word + " ";
+        }
+        str = str.substr(0, str.size() - 1);
+        str += "\r\n";
 
+        int sent_bytes = send(str);
+        if (sent_bytes < 0) {
+            err_msg = "Failed to send all data to server!";
+            this->state = IPKState::ERROR;
+        }
+    } else if (messageType == MESSAGEType::JOIN) {
+        if (words.size() != 2) { // TODO Add checkers
+            clientPrint(MESSAGEType::ERR, {"Invalid /join data! Try again!"}, "");
+            return;
+        }
+
+        string channelID = words[1];
+
+        int sent_bytes = send("JOIN " + channelID + " AS " + displayName + "\r\n");
+        if (sent_bytes < 0) {
+            err_msg = "Failed to send all data to server!";
+            this->state = IPKState::ERROR;
+        }
+    } else if (messageType == MESSAGEType::BYE) {
+        if (words.size() != 1) { // TODO Add checkers
+            clientPrint(MESSAGEType::ERR, {"Invalid \"BYE\" message format! Try again!"}, "");
+            return;
+        }
+
+        state = IPKState::BYE;
+        int sent_bytes = send("BYE\r\n");
+        if (sent_bytes < 0) {
+            err_msg = "Failed to send all data to server!";
+            this->state = IPKState::ERROR;
+        }
     }
-    return true;
 }
 
 ssize_t IPKClient::send(const string &str) {
@@ -129,14 +173,12 @@ void IPKClient::receive(MESSAGEType messageType, const vector<string> &words) {
         if (words.size() > 2) {
             std::string replyStatus = words[1];
             std::vector<std::string> messageContent(words.begin() + 3, words.end());
-            if (replyStatus == "OK") {
+            if (state == IPKState::AUTH && replyStatus == "OK") {
                 state = IPKState::OPEN;
             }
-            clientPrint(MESSAGEType::REPLY, messageContent, "");
+            clientPrint(MESSAGEType::REPLY, messageContent, replyStatus);
         } else {
-            err_msg = "Invalid message format!";
-            this->state = IPKState::ERROR;
-            // TODO SEND ERR AND EXIT
+            messageType = MESSAGEType::UNKNOWN;
         }
     } else if (messageType == MESSAGEType::MSG) {
         if (words.size() > 3) {
@@ -144,17 +186,31 @@ void IPKClient::receive(MESSAGEType messageType, const vector<string> &words) {
             std::vector<std::string> messageContent(words.begin() + 4, words.end());
             clientPrint(MESSAGEType::MSG, messageContent, senderDName);
         } else {
-            err_msg = "Invalid message format!";
-            this->state = IPKState::ERROR;
-            // TODO SEND ERR AND EXIT
+            messageType = MESSAGEType::UNKNOWN;
         }
+    } else if (messageType == MESSAGEType::ERR_MSG) {
+        if (words.size() > 3) {
+            std::string senderDName = words[2];
+            std::vector<std::string> messageContent(words.begin() + 4, words.end());
+            clientPrint(MESSAGEType::ERR_MSG, messageContent, senderDName);
+            send_info(MESSAGEType::BYE, {});
+        } else {
+            messageType = MESSAGEType::UNKNOWN;
+        }
+    }
+
+    if (messageType == MESSAGEType::UNKNOWN) {
+        clientPrint(MESSAGEType::ERR, {"Invalid message from server!"}, "");
+        send_info(MESSAGEType::ERR_MSG, {"Invalid message from server!"});
+        send_info(MESSAGEType::BYE, {"BYE"});
+        state = IPKState::BYE;
     }
 }
 
 void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageContent, const string &sender) {
     switch (type) {
         case MESSAGEType::REPLY: {
-            if (state == IPKState::OPEN) {
+            if (sender == "OK") { // TODO cout => cerr
                 cout << "Success: ";
             } else {
                 cout << "Failure: ";
@@ -172,7 +228,19 @@ void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageConte
             }
             cout << "\n";
             break;
+        case MESSAGEType::ERR_MSG:
+            cout << "ERR FROM " << sender << ": ";
+            for (const auto &message: messageContent) {
+                cout << message << " ";
+            }
+            cout << "\n";
+            break;
         case MESSAGEType::ERR:
+            cout << "ERR: ";
+            for (const auto &message: messageContent) {
+                cout << message << " ";
+            }
+            cout << "\n";
             break;
         case MESSAGEType::AUTH:
             break;
@@ -187,5 +255,13 @@ void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageConte
 
 void IPKClient::printError() {
     cerr << "ERR: " << err_msg << endl;
+}
+
+void IPKClient::rename(const vector<string> &words) {
+    if (words.size() != 2) { // TODO Add checkers
+        clientPrint(MESSAGEType::ERR, {"Invalid /rename data! Try again!"}, "");
+        return;
+    }
+    displayName = words[1];
 }
 

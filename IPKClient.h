@@ -32,14 +32,17 @@ enum class IPKState {
     AUTH,
     OPEN,
     ERROR,
+    BYE
 };
 
 enum class MESSAGEType {
     REPLY,
+    MSG,
+    ERR_MSG,
     ERR,
     AUTH,
     JOIN,
-    MSG,
+    UNKNOWN,
     BYE,
     CONFIRM
 };
@@ -66,14 +69,13 @@ public:
     ~IPKClient();
 
     void connect();
-    bool send_auth_info(const vector<string>& words);
-    bool send_info(MESSAGEType messageType, const vector<string>& words);
+    void disconnect();
+    void send_info(MESSAGEType messageType, const vector<string>& words);
     void receive(MESSAGEType messageType,const vector<string>& words);
     ssize_t send(const string& str);
     void printError();
     void clientPrint(MESSAGEType type, const vector<string>& messageContent, const string& sender);
-
-//    void disconnect();
+    void rename(const vector<string>& words);
     string getState();
 };
 
