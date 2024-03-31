@@ -67,10 +67,11 @@ public:
 
     void connect();
     bool send_auth_info(const vector<string>& words);
+    bool send_info(MESSAGEType messageType, const vector<string>& words);
     void receive(MESSAGEType messageType,const vector<string>& words);
     ssize_t send(const string& str);
     void printError();
-    void clientPrint(MESSAGEType type, const vector<string>& messageContent);
+    void clientPrint(MESSAGEType type, const vector<string>& messageContent, const string& sender);
 
 //    void disconnect();
     string getState();

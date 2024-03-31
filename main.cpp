@@ -129,6 +129,8 @@ int main(int argc, char *argv[]) {
                     return 0;
                 }
                 vector<string> words = getInputData(std::string(buffer));
+                if (words.empty())
+                    continue;
                 if (client.state == IPKState::AUTH) {
                     if (words[0] == "/auth") {
                         if (!client.send_auth_info(words)) {
@@ -136,8 +138,7 @@ int main(int argc, char *argv[]) {
                         } else if (client.state == IPKState::ERROR) {
                             client.printError();
                             return EXIT_FAILURE;
-                        } else
-                            cout << "PS: send data for auth" << endl;
+                        }
                     } else if (words[0] == "/help") {
                         cout << HELP_STRING;
                     } else {
@@ -146,7 +147,15 @@ int main(int argc, char *argv[]) {
                         client.printError();
                     }
                 } else if (client.state == IPKState::OPEN) {
-
+                    if (words[0] == "/join") {
+                    } else if (words[0] == "/rename") {
+                    } else if (words[0] == "/help") {
+                        cout << HELP_STRING;
+                    } else {
+                        if (client.send_info(MESSAGEType::MSG, words)) {
+                            // TODO ERROR
+                        }
+                    }
                 } else if (client.state == IPKState::ERROR) {
 
                 } else {
@@ -166,9 +175,20 @@ int main(int argc, char *argv[]) {
                 if (client.state == IPKState::AUTH) {
                     if (words[0] == "REPLY") {
                         client.receive(MESSAGEType::REPLY, words);
+                    } else {
+                        // something else maybe/ 99.9%
                     }
                 } else if (client.state == IPKState::OPEN) {
+                    if (words[0] == "REPLY") {
+                        client.receive(MESSAGEType::REPLY, words);
+                    } else {
 
+                    }
+                    if (words[0] == "MSG") {
+                        client.receive(MESSAGEType::MSG, words);
+                    } else {
+
+                    }
                 } else if (client.state == IPKState::ERROR) {
 
                 } else {

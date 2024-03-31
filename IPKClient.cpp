@@ -63,7 +63,7 @@ void IPKClient::connect() {
         // TODO: UDP
     }
 
-    if (::connect(fd, (struct sockaddr*)&server_address, addr_len) == -1) {
+    if (::connect(fd, (struct sockaddr *) &server_address, addr_len) == -1) {
         err_msg = "Failed to connect to server.";
         state = IPKState::ERROR;
         return;
@@ -77,7 +77,7 @@ IPKClient::~IPKClient() {
     close(fd);
 }
 
-bool IPKClient::send_auth_info(const vector<string>& words) {
+bool IPKClient::send_auth_info(const vector<string> &words) {
     if (words.size() != 4) { // TODO Add checkers
         err_msg = "Invalid /auth data! Try again!";
         return false;
@@ -95,41 +95,65 @@ bool IPKClient::send_auth_info(const vector<string>& words) {
     return true;
 }
 
+bool IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) {
+    if (messageType == MESSAGEType::MSG) {
+        string str = "MSG FROM" + displayName + " IS ";
+        for (const auto &word: words) {
+            str += word + " ";
+        }
+        str = str.substr(0, str.size() - 1);
+        str += "\r\n";
+
+        int sent_bytes = send(str);
+        if (sent_bytes < 0) {
+            err_msg = "Failed to send all data to server!";
+            this->state = IPKState::ERROR;
+            return false;
+        }
+    } else {
+
+    }
+    return true;
+}
+
 ssize_t IPKClient::send(const string &str) {
     array<char, BUFFER_SIZE> buffer{0};
     memcpy(buffer.data(), str.data(), str.size() + 1);
 
     ssize_t sent_bytes = ::send(fd, buffer.data(), str.size(), 0);
-    if (sent_bytes < 0) {
-        err_msg = "Failed to send data to server!";
-        this->state = IPKState::ERROR;
-    }
-
     return sent_bytes;
 }
 
-void IPKClient::receive(MESSAGEType messageType, const vector<string>& words) {
+void IPKClient::receive(MESSAGEType messageType, const vector<string> &words) {
     if (messageType == MESSAGEType::REPLY) {
-        if(words.size() > 2) {
+        if (words.size() > 2) {
             std::string replyStatus = words[1];
-            std::vector<std::string> messageContent(words.begin()+3, words.end());
-            if(replyStatus == "OK") {
+            std::vector<std::string> messageContent(words.begin() + 3, words.end());
+            if (replyStatus == "OK") {
                 state = IPKState::OPEN;
             }
-            clientPrint(MESSAGEType::REPLY, messageContent);
+            clientPrint(MESSAGEType::REPLY, messageContent, "");
         } else {
             err_msg = "Invalid message format!";
             this->state = IPKState::ERROR;
             // TODO SEND ERR AND EXIT
         }
-    } else {
-
+    } else if (messageType == MESSAGEType::MSG) {
+        if (words.size() > 3) {
+            std::string senderDName = words[2];
+            std::vector<std::string> messageContent(words.begin() + 4, words.end());
+            clientPrint(MESSAGEType::MSG, messageContent, senderDName);
+        } else {
+            err_msg = "Invalid message format!";
+            this->state = IPKState::ERROR;
+            // TODO SEND ERR AND EXIT
+        }
     }
 }
 
-void IPKClient::clientPrint(MESSAGEType type, const vector<string>& messageContent) {
+void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageContent, const string &sender) {
     switch (type) {
-        case MESSAGEType::REPLY:{
+        case MESSAGEType::REPLY: {
             if (state == IPKState::OPEN) {
                 cout << "Success: ";
             } else {
@@ -141,13 +165,18 @@ void IPKClient::clientPrint(MESSAGEType type, const vector<string>& messageConte
             cout << "\n";
             break;
         }
+        case MESSAGEType::MSG:
+            cout << sender << ": ";
+            for (const auto &message: messageContent) {
+                cout << message << " ";
+            }
+            cout << "\n";
+            break;
         case MESSAGEType::ERR:
             break;
         case MESSAGEType::AUTH:
             break;
         case MESSAGEType::JOIN:
-            break;
-        case MESSAGEType::MSG:
             break;
         case MESSAGEType::BYE:
             break;
