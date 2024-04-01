@@ -25,8 +25,13 @@
 
 using namespace std;
 
-#define TIMEOUT 4
 #define BUFFER_SIZE 1024
+
+enum class Protocol {
+    TCP,
+    UDP,
+    None
+};
 
 enum class IPKState {
     START,
@@ -47,6 +52,10 @@ enum class MESSAGEType {
     BYE
 };
 
+/**
+ * @class IPKClient
+ * @brief Represents a client for the IPK messaging system
+ */
 class IPKClient {
     int port;
     int mode;

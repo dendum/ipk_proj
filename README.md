@@ -1,4 +1,4 @@
-### IPK Project 1: Client for a chat server using IPK24-CHAT protocol
+### IPK Project 1: Client for a chat server using IPK24-CHAT protocol (only TCP)
 ### Jméno a příjmení: Denys Dumych
 ### Login: xdumyc00
 
@@ -23,7 +23,7 @@ The implemented application is a client for a network communication system. It a
 - **IPKClient Class**: Encapsulates the client's functionality, including establishing a connection with the server, sending and receiving messages, and managing the client's state.
 
 - **Main Functionality**:
-    - **Parsing Arguments**: Parses command-line arguments to determine the server's hostname, port number, communication mode (TCP/UDP), and other parameters.
+    - **Parsing Arguments**: Parses command-line arguments to determine the server's hostname, port number, communication mode (TCP), and other parameters.
     - **Configuring Client**: Creates and configures the client based on the provided arguments, including establishing a connection with the server.
     - **Setting up Epoll**: Utilizes epoll to handle multiple file descriptors asynchronously, including stdin and the client socket.
     - **Handling User Input**: Reads user input from stdin asynchronously and processes it according to the client's state.
@@ -65,7 +65,7 @@ This client application facilitates communication with a server in a networked e
 ---
 
 #### 4. Testing
-TODO
+The program was ran and fully functional on the custom shared development environments.
 
 ---
 

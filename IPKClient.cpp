@@ -38,9 +38,16 @@ IPKClient::IPKClient(int port, string hostname, int mode) {
     server_address.sin_port = htons(this->port);
 }
 
+/**
+ * @brief Establishes a connection with the server
+ *
+ * This function is used to establish a connection with the server.
+ *
+ * @note The function assumes that the necessary variables (fd, server_address, addr_len, err_msg, state) have been properly initialized.
+ */
 void IPKClient::connect() {
     if (mode == SOCK_DGRAM) {
-        // TODO: UDP
+        // UDP
         err_msg = "Failed to connect to server.";
         state = IPKState::ERROR;
         return;
@@ -59,6 +66,15 @@ IPKClient::~IPKClient() {
     close(fd);
 }
 
+/**
+ * @brief Sends information to the server based on the specified message type and words
+ *
+ * This function is responsible for sending information to the server based on the specified message type and words.
+ * It first checks the message type and performs the necessary actions.
+ *
+ * @param messageType The type of the message to send
+ * @param words The words associated with the message
+ */
 void IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) {
     if (messageType == MESSAGEType::AUTH) {
         if (words.size() != 4) {
@@ -102,7 +118,7 @@ void IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) 
             this->state = IPKState::ERROR;
         }
     } else if (messageType == MESSAGEType::JOIN) {
-        if (words.size() != 2) { // TODO Add checkers
+        if (words.size() != 2) {
             clientPrint(MESSAGEType::ERR, {"Invalid /join data! Try again!"}, "");
             return;
         }
@@ -115,7 +131,7 @@ void IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) 
             this->state = IPKState::ERROR;
         }
     } else if (messageType == MESSAGEType::BYE) {
-        if (words.size() != 1) { // TODO Add checkers
+        if (words.size() != 1) {
             clientPrint(MESSAGEType::ERR, {"Invalid \"BYE\" message format! Try again!"}, "");
             return;
         }
@@ -129,6 +145,15 @@ void IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) 
     }
 }
 
+/**
+ * @brief Sends a string message to the server.
+ *
+ * The function sends the provided string message to the server using the initialized socket file descriptor (fd).
+ * The message is copied into a buffer and then sent using the send() function.
+ *
+ * @param str The string message to be sent.
+ * @return The number of bytes sent on success, or -1 on error.
+ */
 ssize_t IPKClient::send(const string &str) {
     array<char, BUFFER_SIZE> buffer{0};
     memcpy(buffer.data(), str.data(), str.size() + 1);
@@ -137,6 +162,12 @@ ssize_t IPKClient::send(const string &str) {
     return sent_bytes;
 }
 
+/**
+ * @brief Receives a message from the server and performs the necessary actions based on the message type and words
+ *
+ * @param messageType The type of the message received
+ * @param words The words associated with the message
+ */
 void IPKClient::receive(MESSAGEType messageType, const vector<string> &words) {
     if (messageType == MESSAGEType::REPLY) {
         if (words.size() > 2) {
@@ -177,6 +208,16 @@ void IPKClient::receive(MESSAGEType messageType, const vector<string> &words) {
     }
 }
 
+/**
+ * @brief Prints the message content based on the message type and the sender.
+ *
+ * This function prints the message content to standard output or standard error
+ * based on the message type.
+ *
+ * @param type The type of the message.
+ * @param messageContent The vector of message content.
+ * @param sender The sender of the message.
+ */
 void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageContent, const string &sender) {
     switch (type) {
         case MESSAGEType::REPLY: {
@@ -229,8 +270,13 @@ void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageConte
     }
 }
 
+/**
+ * @brief Renames the display name of the client.
+ *
+ * @param words The vector of words containing the command name and the new display name.
+ */
 void IPKClient::rename(const vector<string> &words) {
-    if (words.size() != 2) { // TODO Add checkers
+    if (words.size() != 2) {
         clientPrint(MESSAGEType::ERR, {"Invalid /rename data! Try again!"}, "");
         return;
     }

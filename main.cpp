@@ -9,18 +9,32 @@ const int DEFAULT_TIMEOUT = 250;
 const int DEFAULT_RETRANSMITS = 3;
 const std::string USAGE_STRING = "Usage: ./ipk24 -s <host> -p <port> -t <mode> -d <timeout> -r <udpRet> -h <help>\n";
 const std::string HELP_STRING = "help info:\n/auth\t{Username} {Secret} {DisplayName}\n/join\t{ChannelID}\n/rename\t{DisplayName}\n/help\n";
-enum class Protocol {
-    TCP,
-    UDP,
-    None
-};
 
+/**
+ * @brief Converts a string to a Protocol.
+ *
+ * This function takes a string as input and returns the corresponding Protocol
+ * value.
+ *
+ * @param str The input string to convert to a Protocol.
+ * @return The corresponding Protocol value.
+ */
 Protocol to_protocol(const std::string &str) {
     if (str == "tcp") return Protocol::TCP;
     if (str == "udp") return Protocol::UDP;
     return Protocol::None;
 }
 
+/**
+ * @brief Adds a file descriptor to an epoll instance.
+ *
+ * This function adds a file descriptor to the specified epoll instance using
+ * the epoll_ctl system call with the EPOLL_CTL_ADD operation.
+ *
+ * @param epoll_fd The file descriptor referring to the epoll instance.
+ * @param event The epoll_event structure that contains the event data.
+ * @param fd The file descriptor to be added to the epoll instance.
+ */
 void epoll_ctl_add(int epoll_fd, struct epoll_event &event, int fd) {
     event.data.fd = fd;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
@@ -30,6 +44,41 @@ void epoll_ctl_add(int epoll_fd, struct epoll_event &event, int fd) {
     }
 }
 
+/**
+ * @brief Signal handler for SIGINT
+ */
+void handle_sigint(int sig) {
+    write(pipefd[1], "X", 1);
+}
+
+/**
+ * @brief Cleanup function to close file descriptors.
+ *
+ * This function closes the read and write ends of a pipe and an epoll file descriptor.
+ *
+ * @param pipefd An array containing the read and write ends of the pipe.
+ * @param epoll_fd The epoll file descriptor to be closed.
+ */
+void cleanup(int pipefd[], int epoll_fd) {
+    close(pipefd[0]);
+    close(pipefd[1]);
+    close(epoll_fd);
+}
+
+/**
+ * @brief Parses the command line arguments and assigns the values to the corresponding variables.
+ *
+ * This function parses the command line arguments using getopt and assigns the values to the
+ * specified variables. The allowed options are -t, -s, -p, -d, -r, and -h.
+ *
+ * @param argc The total number of command line arguments.
+ * @param argv An array of strings containing the command line arguments.
+ * @param hostname A string reference to store the value of the -s option.
+ * @param protocol A Protocol reference to store the value of the -t option.
+ * @param port An integer reference to store the value of the -p option.
+ * @param udp_timeout An integer reference to store the value of the -d option.
+ * @param max_retransmits An integer reference to store the value of the -r option.
+ */
 void parse_arguments(int argc, char *argv[], std::string &hostname, Protocol &protocol, int &port, int &udp_timeout,
                      int &max_retransmits) {
     int option;
@@ -52,13 +101,24 @@ void parse_arguments(int argc, char *argv[], std::string &hostname, Protocol &pr
                 break;
             case 'h':
                 cout << USAGE_STRING;
-                exit(EXIT_FAILURE);
+                exit(EXIT_SUCCESS);
             default:
                 break;
         }
     }
 }
 
+/**
+ * @brief Configures a new IPKClient object.
+ *
+ * This function creates a new IPKClient object with the specified hostname, protocol, and port number.
+ * The IPKClient object is configured based on the specified protocol and connects to the specified hostname and port.
+ *
+ * @param hostname The hostname to connect to.
+ * @param protocol The protocol to use (TCP or UDP).
+ * @param port The port number to connect to.
+ * @return The configured IPKClient object.
+ */
 IPKClient ConfigureClient(const std::string &hostname, Protocol protocol, int port) {
     IPKClient client(port, hostname, protocol == Protocol::TCP ? SOCK_STREAM : SOCK_DGRAM);
     if (client.state == IPKState::ERROR) {
@@ -82,20 +142,16 @@ vector<string> getInputData(const string &str) {
     return words;
 }
 
-void handle_sigint(int sig) {
-    write(pipefd[1], "X", 1);
-}
-
+/**
+ * @brief Check the client state and break if necessary.
+ *
+ * @param clientState The current state of the client.
+ * @param going A boolean reference representing whether the program should continue or break.
+ */
 void checkStateAndBreakIfNecessary(IPKState clientState, bool &going) {
     if (clientState == IPKState::BYE || clientState == IPKState::ERROR) {
         going = false;
     }
-}
-
-void cleanup(int pipefd[], int epoll_fd) {
-    close(pipefd[0]);
-    close(pipefd[1]);
-    close(epoll_fd);
 }
 
 int main(int argc, char *argv[]) {
@@ -191,6 +247,8 @@ int main(int argc, char *argv[]) {
                 }
                 buffer[bytes_received] = '\0';
                 vector<string> words = getInputData(std::string(buffer));
+                if (words.empty())
+                    continue;
                 if (client.state == IPKState::AUTH) {
                     if (words[0] == "REPLY") {
                         client.receive(MESSAGEType::REPLY, words);
