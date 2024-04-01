@@ -2,8 +2,6 @@
 
 #include "IPKClient.h"
 
-int pipefd[2];
-// a61b7fb9-f7e0-4d7d-b876-d26e8fcbc308
 const int DEFAULT_PORT = 4567;
 const int DEFAULT_TIMEOUT = 250;
 const int DEFAULT_RETRANSMITS = 3;
@@ -110,7 +108,7 @@ int main(int argc, char *argv[]) {
 
     // Check for errors and print usage if necessary
     if (hostname.empty() || protocol == Protocol::None) {
-        cerr << "ERR: " << (hostname.empty() ? "Hostname" : "Mode") << " not specified!\n" << USAGE_STRING;
+        cerr << "ERROR: " << (hostname.empty() ? "Hostname" : "Mode") << " not specified!\n" << USAGE_STRING;
         return EXIT_FAILURE;
     }
 
@@ -163,9 +161,7 @@ int main(int argc, char *argv[]) {
                                            {"You are not authed! Try: /auth {Username} {Secret} {DisplayName}"}, "");
                     }
                 } else if (client.state == IPKState::OPEN) {
-                    if (words[0] == "/auth") {
-                        client.clientPrint(MESSAGEType::ERR,{"You are already authed!"}, "");
-                    } else if (words[0] == "/join") {
+                    if (words[0] == "/join") {
                         client.send_info(MESSAGEType::JOIN, words);
                     } else if (words[0] == "/rename") {
                         client.rename(words);
@@ -196,8 +192,6 @@ int main(int argc, char *argv[]) {
                         client.receive(MESSAGEType::REPLY, words);
                     } else if (words[0] == "MSG") {
                         client.receive(MESSAGEType::MSG, words);
-                    } else if (words[0] == "ERR") {
-                        client.receive(MESSAGEType::ERR_MSG, words);
                     }
                 } else if (client.state == IPKState::OPEN) {
                     if (words[0] == "REPLY") {
@@ -206,8 +200,6 @@ int main(int argc, char *argv[]) {
                         client.receive(MESSAGEType::MSG, words);
                     } else if (words[0] == "ERR") {
                         client.receive(MESSAGEType::ERR_MSG, words);
-                    } else if (words[0] == "BYE") {
-                        client.state = IPKState::BYE;
                     } else {
                         client.receive(MESSAGEType::UNKNOWN, words);
                     }

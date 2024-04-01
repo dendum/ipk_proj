@@ -50,8 +50,13 @@ IPKClient::IPKClient(int port, string hostname, int mode) {
 
     memset((&server_address), 0, this->addr_len);
     server_address.sin_family = AF_INET;
-    memcpy((&(server_address).sin_addr.s_addr), host->h_addr, host->h_length);
+    memcpy(host->h_addr, (&(server_address).sin_addr.s_addr), host->h_length);
     server_address.sin_port = htons(this->port);
+    int valid = inet_pton(AF_INET, this->hostname.c_str(), &server_address.sin_addr);
+    if (valid <= 0) {
+        err_msg = valid == 0 ? "Invalid address!" : "Failed to convert address!";
+        state = IPKState::ERROR;
+    }
 
 }
 
@@ -176,7 +181,7 @@ void IPKClient::receive(MESSAGEType messageType, const vector<string> &words) {
             std::string senderDName = words[2];
             std::vector<std::string> messageContent(words.begin() + 4, words.end());
             clientPrint(MESSAGEType::ERR_MSG, messageContent, senderDName);
-            send_info(MESSAGEType::BYE, {"BYE"});
+            send_info(MESSAGEType::BYE, {});
         } else {
             messageType = MESSAGEType::UNKNOWN;
         }
@@ -194,49 +199,37 @@ void IPKClient::receive(MESSAGEType messageType, const vector<string> &words) {
 void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageContent, const string &sender) {
     switch (type) {
         case MESSAGEType::REPLY: {
-            if (sender == "OK") {
-                cerr << "Success: ";
+            if (sender == "OK") { // TODO cout => cerr
+                cout << "Success: ";
             } else {
-                cerr << "Failure: ";
+                cout << "Failure: ";
             }
             for (const auto &message: messageContent) {
-                cerr << message;
-                if (&message != &messageContent.back()) {
-                    cerr << " ";
-                }
+                cout << message << " ";
             }
-            cerr << "\n";
+            cout << "\n";
             break;
         }
         case MESSAGEType::MSG:
             cout << sender << ": ";
             for (const auto &message: messageContent) {
-                cout << message;
-                if (&message != &messageContent.back()) {
-                    cout << " ";
-                }
+                cout << message << " ";
             }
             cout << "\n";
             break;
         case MESSAGEType::ERR_MSG:
-            cerr << "ERR FROM " << sender << ": ";
+            cout << "ERR FROM " << sender << ": ";
             for (const auto &message: messageContent) {
-                cerr << message;
-                if (&message != &messageContent.back()) {
-                    cerr << " ";
-                }
+                cout << message << " ";
             }
-            cerr << "\n";
+            cout << "\n";
             break;
         case MESSAGEType::ERR:
-            cerr << "ERR: ";
+            cout << "ERR: ";
             for (const auto &message: messageContent) {
-                cerr << message;
-                if (&message != &messageContent.back()) {
-                    cerr << " ";
-                }
+                cout << message << " ";
             }
-            cerr << "\n";
+            cout << "\n";
             break;
         case MESSAGEType::AUTH:
             break;
@@ -246,9 +239,11 @@ void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageConte
             break;
         case MESSAGEType::CONFIRM:
             break;
-        case MESSAGEType::UNKNOWN:
-            break;
     }
+}
+
+void IPKClient::printError() {
+    cerr << "ERR: " << err_msg << endl;
 }
 
 void IPKClient::rename(const vector<string> &words) {
