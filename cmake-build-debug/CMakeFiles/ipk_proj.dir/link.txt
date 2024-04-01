@@ -1,1 +1,0 @@
-/usr/bin/c++ -g CMakeFiles/ipk_proj.dir/main.cpp.o -o ipk_proj 
