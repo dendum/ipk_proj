@@ -155,7 +155,6 @@ void checkStateAndBreakIfNecessary(IPKState clientState, bool &going) {
 }
 
 int main(int argc, char *argv[]) {
-
     std::string hostname;
     Protocol protocol = Protocol::None;
     int port = DEFAULT_PORT;
