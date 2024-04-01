@@ -2,6 +2,8 @@
 
 #include "IPKClient.h"
 
+int pipefd[2];
+//  a61b7fb9-f7e0-4d7d-b876-d26e8fcbc308
 const int DEFAULT_PORT = 4567;
 const int DEFAULT_TIMEOUT = 250;
 const int DEFAULT_RETRANSMITS = 3;
@@ -57,7 +59,7 @@ void parse_arguments(int argc, char *argv[], std::string &hostname, Protocol &pr
     }
 }
 
-IPKClient ConfigureClient(const std::string& hostname, Protocol protocol, int port) {
+IPKClient ConfigureClient(const std::string &hostname, Protocol protocol, int port) {
     IPKClient client(port, hostname, protocol == Protocol::TCP ? SOCK_STREAM : SOCK_DGRAM);
     if (client.state == IPKState::ERROR) {
         cerr << "ERR: " << client.err_msg << endl;
@@ -84,7 +86,7 @@ void handle_sigint(int sig) {
     write(pipefd[1], "X", 1); // write to pipe
 }
 
-void checkStateAndBreakIfNecessary(IPKState clientState, bool& going) {
+void checkStateAndBreakIfNecessary(IPKState clientState, bool &going) {
     if (clientState == IPKState::BYE || clientState == IPKState::ERROR) {
         going = false;
     }
@@ -108,7 +110,7 @@ int main(int argc, char *argv[]) {
 
     // Check for errors and print usage if necessary
     if (hostname.empty() || protocol == Protocol::None) {
-        cerr << "ERROR: " << (hostname.empty() ? "Hostname" : "Mode") << " not specified!\n" << USAGE_STRING;
+        cerr << "ERR: " << (hostname.empty() ? "Hostname" : "Mode") << " not specified!\n" << USAGE_STRING;
         return EXIT_FAILURE;
     }
 
@@ -161,7 +163,9 @@ int main(int argc, char *argv[]) {
                                            {"You are not authed! Try: /auth {Username} {Secret} {DisplayName}"}, "");
                     }
                 } else if (client.state == IPKState::OPEN) {
-                    if (words[0] == "/join") {
+                    if (words[0] == "/auth") {
+                        client.clientPrint(MESSAGEType::ERR, {"You are already authed!"}, "");
+                    } else if (words[0] == "/join") {
                         client.send_info(MESSAGEType::JOIN, words);
                     } else if (words[0] == "/rename") {
                         client.rename(words);
@@ -192,6 +196,8 @@ int main(int argc, char *argv[]) {
                         client.receive(MESSAGEType::REPLY, words);
                     } else if (words[0] == "MSG") {
                         client.receive(MESSAGEType::MSG, words);
+                    } else if (words[0] == "ERR") {
+                        client.receive(MESSAGEType::ERR_MSG, words);
                     }
                 } else if (client.state == IPKState::OPEN) {
                     if (words[0] == "REPLY") {
@@ -208,7 +214,7 @@ int main(int argc, char *argv[]) {
                 if (!going)
                     break;
                 memset(buffer, 0, BUFFER_SIZE);
-            } else if(events[i].data.fd == pipefd[0]) {
+            } else if (events[i].data.fd == pipefd[0]) {
                 client.send_info(MESSAGEType::BYE, {"BYE"});
                 checkStateAndBreakIfNecessary(client.state, going);
                 if (!going)
