@@ -1,0 +1,2 @@
+- **TCP**: The code fully implements the tcp version of the task. The code is tested, error conditions such as connection failures, invalid inputs, or server responses are detected and handled appropriately, with error messages provided to the user.
+- **UDP**: Does not function.

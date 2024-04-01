@@ -69,5 +69,9 @@ The program was ran and fully functional on the custom shared development enviro
 
 ---
 
-#### 5. Sources
+#### 5. Bibliography (sources)
 
+* GeeksforGeeks. (n.d.). different articles [24.03.2024]; URL: https://www.geeksforgeeks.org/
+* Habr. (n.d.) different articles [23.03.2024]; URL: https://www.habr.com
+* Ing. Daniel Dolejška, Ing. Vladimír Veselý Ph.D., IPK lectures, [cited 22.03.2024]
+* Online resources: youtube, medium etc.
