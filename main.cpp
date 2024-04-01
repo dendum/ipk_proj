@@ -67,6 +67,11 @@ vector<string> getInputData(const string &str) {
     return words;
 }
 
+// Signal handler
+void handle_sigint(int sig) {
+    write(pipefd[1], "X", 1); // write to pipe
+}
+
 int main(int argc, char *argv[]) {
 
     std::string hostname;
@@ -109,11 +114,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // setup signal handler and create pipe
+    signal(SIGINT, handle_sigint);
+    pipe(pipefd);
     // Add stdin and client socket to epoll
     struct epoll_event event, events[MAX_EVENTS];
     event.events = EPOLLIN | EPOLLET;
     epoll_ctl_add(epoll_fd, event, client.fd);
     epoll_ctl_add(epoll_fd, event, stdin_fd);
+    epoll_ctl_add(epoll_fd, event, pipefd[0]);
 
     char buffer[BUFFER_SIZE];
     bool going = true;
@@ -133,10 +142,6 @@ int main(int argc, char *argv[]) {
                 if (client.state == IPKState::AUTH) {
                     if (words[0] == "/auth") {
                         client.send_info(MESSAGEType::AUTH, words);
-                        if (client.state == IPKState::ERROR) {
-                            going = false;
-                            break;
-                        }
                     } else if (words[0] == "/help") {
                         cout << HELP_STRING;
                     } else {
@@ -146,36 +151,19 @@ int main(int argc, char *argv[]) {
                 } else if (client.state == IPKState::OPEN) {
                     if (words[0] == "/join") {
                         client.send_info(MESSAGEType::JOIN, words);
-                        if (client.state == IPKState::ERROR) {
-                            going = false;
-                            break;
-                        }
                     } else if (words[0] == "/rename") {
                         client.rename(words);
                     } else if (words[0] == "/help") {
                         cout << HELP_STRING;
                     } else if (words[0] == "BYE") {
                         client.send_info(MESSAGEType::BYE, words);
-                        if (client.state == IPKState::ERROR) {
-                            going = false;
-                            break;
-                        }
-                        // TODO??? Break while anyway, we sent BYE!
-                        going = false;
-                        break;
                     } else {
                         client.send_info(MESSAGEType::MSG, words);
-                        if (client.state == IPKState::ERROR) {
-                            going = false;
-                            break;
-                        }
                     }
-                } else if (client.state == IPKState::ERROR) {
-                    cout << "HERE_1" << endl;
+                }
+                if (client.state == IPKState::BYE || client.state == IPKState::ERROR) {
                     going = false;
                     break;
-                } else {
-                    cout << "HERE_2" << endl;
                 }
 
                 memset(buffer, 0, BUFFER_SIZE);
@@ -193,8 +181,6 @@ int main(int argc, char *argv[]) {
                         client.receive(MESSAGEType::REPLY, words);
                     } else if (words[0] == "MSG") {
                         client.receive(MESSAGEType::MSG, words);
-                    } else {
-
                     }
                 } else if (client.state == IPKState::OPEN) {
                     if (words[0] == "REPLY") {
@@ -206,20 +192,18 @@ int main(int argc, char *argv[]) {
                     } else {
                         client.receive(MESSAGEType::UNKNOWN, words);
                     }
-
-                    if (client.state == IPKState::BYE || client.state == IPKState::ERROR) {
-                        going = false;
-                        break;
-                    }
-                } else if (client.state == IPKState::ERROR) {
-                    cout << "HERE_3" << endl;
+                }
+                if (client.state == IPKState::BYE || client.state == IPKState::ERROR) {
                     going = false;
                     break;
-                } else {
-                    cout << "HERE_4" << endl;
                 }
-
                 memset(buffer, 0, BUFFER_SIZE);
+            } else if(events[i].data.fd == pipefd[0]) {
+                client.send_info(MESSAGEType::BYE, {"BYE"});
+                if (client.state == IPKState::BYE || client.state == IPKState::ERROR) {
+                    going = false;
+                    break;
+                }
             }
         }
     }
@@ -229,6 +213,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Cleanup
+    close(pipefd[0]);
+    close(pipefd[1]);
     close(epoll_fd);
     return 0;
 

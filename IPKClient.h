@@ -20,12 +20,15 @@
 #include <sys/epoll.h>
 #include <vector>
 #include <sstream>
-
+#include <atomic>
+#include <csignal>
 
 using namespace std;
 
 #define TIMEOUT 4
 #define BUFFER_SIZE 1024
+
+int pipefd[2];
 
 enum class IPKState {
     START,
