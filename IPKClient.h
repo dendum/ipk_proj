@@ -52,14 +52,14 @@ class IPKClient {
     int port;
     int mode;
     string hostname;
+
     struct hostent* host;
     struct sockaddr_in server_address {};
     socklen_t addr_len = sizeof(server_address);
+
     string username;
     string displayName;
     string secret;
-
-
 
 public:
     int fd;
@@ -70,11 +70,9 @@ public:
     ~IPKClient();
 
     void connect();
-    void disconnect();
     void send_info(MESSAGEType messageType, const vector<string>& words);
     void receive(MESSAGEType messageType,const vector<string>& words);
     ssize_t send(const string& str);
-    void printError();
     void clientPrint(MESSAGEType type, const vector<string>& messageContent, const string& sender);
     void rename(const vector<string>& words);
     string getState();

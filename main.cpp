@@ -16,7 +16,6 @@ enum class Protocol {
 };
 
 Protocol to_protocol(const std::string &str) {
-    // Helper function
     if (str == "tcp") return Protocol::TCP;
     if (str == "udp") return Protocol::UDP;
     return Protocol::None;
@@ -60,6 +59,20 @@ void parse_arguments(int argc, char *argv[], std::string &hostname, Protocol &pr
     }
 }
 
+IPKClient ConfigureClient(const std::string& hostname, Protocol protocol, int port) {
+    IPKClient client(port, hostname, protocol == Protocol::TCP ? SOCK_STREAM : SOCK_DGRAM);
+    if (client.state == IPKState::ERROR) {
+        cerr << "ERR: " << client.err_msg << endl;
+        exit(EXIT_FAILURE);
+    }
+    client.connect();
+    if (client.state == IPKState::ERROR) {
+        cerr << "ERR: " << client.err_msg << endl;
+        exit(EXIT_FAILURE);
+    }
+    return client;
+}
+
 vector<string> getInputData(const string &str) {
     std::vector<std::string> words;
     std::stringstream ss(str);
@@ -69,9 +82,20 @@ vector<string> getInputData(const string &str) {
     return words;
 }
 
-// Signal handler
 void handle_sigint(int sig) {
     write(pipefd[1], "X", 1); // write to pipe
+}
+
+void checkStateAndBreakIfNecessary(IPKState clientState, bool& going) {
+    if (clientState == IPKState::BYE || clientState == IPKState::ERROR) {
+        going = false;
+    }
+}
+
+void cleanup(int pipefd[], int epoll_fd) {
+    close(pipefd[0]);
+    close(pipefd[1]);
+    close(epoll_fd);
 }
 
 int main(int argc, char *argv[]) {
@@ -83,9 +107,6 @@ int main(int argc, char *argv[]) {
     int max_retransmits = DEFAULT_RETRANSMITS;
 
     parse_arguments(argc, argv, hostname, protocol, port, udp_timeout, max_retransmits);
-//    cout << port << endl;
-//    cout << hostname << endl;
-//    cout << static_cast<int>(protocol) << endl;
 
     // Check for errors and print usage if necessary
     if (hostname.empty() || protocol == Protocol::None) {
@@ -93,18 +114,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    IPKClient client(port, hostname, protocol == Protocol::TCP ? SOCK_STREAM : SOCK_DGRAM);
-    if (client.state == IPKState::ERROR) {
-        cerr << "ERR: " << client.err_msg << endl;
-        return EXIT_FAILURE;
-    }
-
-    /*Connect to server*/
-    client.connect();
-    if (client.state == IPKState::ERROR) {
-        cerr << "ERR: " << client.err_msg << endl;
-        return EXIT_FAILURE;
-    }
+    IPKClient client = ConfigureClient(hostname, protocol, port);
 
     // Set non-blocking mode for stdin
     int stdin_fd = fileno(stdin);
@@ -133,14 +143,11 @@ int main(int argc, char *argv[]) {
     bool going = true;
     while (going) {
         int num_events = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
-//        cout << "CUR STATE: " << client.getState() << endl;
         for (int i = 0; i < num_events; ++i) {
             if (events[i].data.fd == stdin_fd) {
                 std::cin.getline(buffer, BUFFER_SIZE);
                 if (std::cin.eof()) {
-                    close(pipefd[0]);
-                    close(pipefd[1]);
-                    close(epoll_fd);
+                    cleanup(pipefd, epoll_fd);
                     return 0;
                 }
                 vector<string> words = getInputData(std::string(buffer));
@@ -170,20 +177,16 @@ int main(int argc, char *argv[]) {
                         client.send_info(MESSAGEType::MSG, words);
                     }
                 }
-                if (client.state == IPKState::BYE || client.state == IPKState::ERROR) {
-                    going = false;
+                checkStateAndBreakIfNecessary(client.state, going);
+                if (!going)
                     break;
-                }
-
                 memset(buffer, 0, BUFFER_SIZE);
             } else if (events[i].data.fd == client.fd) {
                 int bytes_received = recv(client.fd, buffer, BUFFER_SIZE, 0);
-                if (bytes_received <= 0) {
+                if (bytes_received == 0) {
                     client.clientPrint(MESSAGEType::ERR, {"Server closed the connection."}, "");
-//                    client.send_info(MESSAGEType::BYE, {"BYE"});
-                    close(pipefd[0]);
-                    close(pipefd[1]);
-                    close(epoll_fd);
+                    client.send_info(MESSAGEType::BYE, {"BYE"});
+                    cleanup(pipefd, epoll_fd);
                     return EXIT_FAILURE;
                 }
                 buffer[bytes_received] = '\0';
@@ -209,29 +212,25 @@ int main(int argc, char *argv[]) {
                         client.receive(MESSAGEType::UNKNOWN, words);
                     }
                 }
-                if (client.state == IPKState::BYE || client.state == IPKState::ERROR) {
-                    going = false;
+                checkStateAndBreakIfNecessary(client.state, going);
+                if (!going)
                     break;
-                }
                 memset(buffer, 0, BUFFER_SIZE);
             } else if(events[i].data.fd == pipefd[0]) {
                 client.send_info(MESSAGEType::BYE, {"BYE"});
-                if (client.state == IPKState::BYE || client.state == IPKState::ERROR) {
-                    going = false;
+                checkStateAndBreakIfNecessary(client.state, going);
+                if (!going)
                     break;
-                }
             }
         }
     }
     if (client.state == IPKState::ERROR) {
         client.clientPrint(MESSAGEType::ERR, {client.err_msg}, "");
+        cleanup(pipefd, epoll_fd);
         return EXIT_FAILURE;
     }
 
-    // Cleanup
-    close(pipefd[0]);
-    close(pipefd[1]);
-    close(epoll_fd);
+    cleanup(pipefd, epoll_fd);
     return 0;
 
 }

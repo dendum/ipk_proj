@@ -68,26 +68,14 @@ void IPKClient::connect() {
     this->state = IPKState::AUTH;
 }
 
-void IPKClient::disconnect() {
-    // TCP
-    if (mode == SOCK_STREAM) {
-        /* Client is up - graceful exit */
-        if (state != IPKState::BYE) {
-
-        }
-
-    }
-}
-
 IPKClient::~IPKClient() {
-    // TODO if (need) {disconnect()}
     shutdown(fd, SHUT_RDWR);
     close(fd);
 }
 
 void IPKClient::send_info(MESSAGEType messageType, const vector<string> &words) {
     if (messageType == MESSAGEType::AUTH) {
-        if (words.size() != 4) { // TODO Add checkers
+        if (words.size() != 4) {
             clientPrint(MESSAGEType::ERR, {"Invalid /auth data! Try again!"}, "");
             return;
         }
@@ -197,6 +185,7 @@ void IPKClient::receive(MESSAGEType messageType, const vector<string> &words) {
     if (messageType == MESSAGEType::UNKNOWN) {
         clientPrint(MESSAGEType::ERR, {"Invalid message from server!"}, "");
         send_info(MESSAGEType::ERR_MSG, {"Invalid message from server!"});
+        sleep(1);
         send_info(MESSAGEType::BYE, {"BYE"});
         state = IPKState::BYE;
     }
