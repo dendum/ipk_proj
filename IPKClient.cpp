@@ -1,21 +1,5 @@
 #include "IPKClient.h"
 
-string IPKClient::getState() {
-    switch (state) {
-        case IPKState::START:
-            return "START";
-        case IPKState::AUTH:
-            return "AUTH";
-        case IPKState::OPEN:
-            return "OPEN";
-        case IPKState::ERROR:
-            return "ERROR";
-        case IPKState::BYE:
-            return "BYE";
-    }
-    return "NONE";
-}
-
 
 IPKClient::IPKClient(int port, string hostname, int mode) {
     state = IPKState::START;
@@ -57,6 +41,9 @@ IPKClient::IPKClient(int port, string hostname, int mode) {
 void IPKClient::connect() {
     if (mode == SOCK_DGRAM) {
         // TODO: UDP
+        err_msg = "Failed to connect to server.";
+        state = IPKState::ERROR;
+        return;
     }
 
     if (::connect(fd, (struct sockaddr *) &server_address, addr_len) == -1) {
@@ -237,15 +224,7 @@ void IPKClient::clientPrint(MESSAGEType type, const vector<string> &messageConte
             }
             cerr << "\n";
             break;
-        case MESSAGEType::AUTH:
-            break;
-        case MESSAGEType::JOIN:
-            break;
-        case MESSAGEType::BYE:
-            break;
-        case MESSAGEType::CONFIRM:
-            break;
-        case MESSAGEType::UNKNOWN:
+        default:
             break;
     }
 }

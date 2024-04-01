@@ -83,7 +83,7 @@ vector<string> getInputData(const string &str) {
 }
 
 void handle_sigint(int sig) {
-    write(pipefd[1], "X", 1); // write to pipe
+    write(pipefd[1], "X", 1);
 }
 
 void checkStateAndBreakIfNecessary(IPKState clientState, bool &going) {

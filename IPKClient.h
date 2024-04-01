@@ -44,8 +44,7 @@ enum class MESSAGEType {
     AUTH,
     JOIN,
     UNKNOWN,
-    BYE,
-    CONFIRM
+    BYE
 };
 
 class IPKClient {
@@ -71,11 +70,10 @@ public:
 
     void connect();
     void send_info(MESSAGEType messageType, const vector<string>& words);
-    void receive(MESSAGEType messageType,const vector<string>& words);
     ssize_t send(const string& str);
+    void receive(MESSAGEType messageType,const vector<string>& words);
     void clientPrint(MESSAGEType type, const vector<string>& messageContent, const string& sender);
     void rename(const vector<string>& words);
-    string getState();
 };
 
 
