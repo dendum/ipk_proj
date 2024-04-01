@@ -66,6 +66,11 @@ This client application facilitates communication with a server in a networked e
 
 #### 4. Testing
 The program was ran and fully functional on the custom shared development environments.
+Also here are some custom tests results.
+![Example Image](./docs/tests_1.png)
+![Example Image](./docs/tests_2.png)
+![Example Image](./docs/tests_3.png)
+![Example Image](./docs/tests_4.png)
 
 ---
 
